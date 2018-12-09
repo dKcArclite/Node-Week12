@@ -179,7 +179,7 @@ function getBooksFromDb(param, callback) {
     switch (type) {
         case 'title':
             params = [param];
-            sql = "SELECT b.title, b.author_id, lower(a.first_name || COALESCE('' || a.middle_name,'') || '' || a.last_name) author from book b inner join author a on b.author_id = a.author_id WHERE b.title = $1::VARCHAR(100)";
+            sql = "SELECT b.title, b.author_id, lower(a.first_name || COALESCE('' || a.middle_name,'') || '' || a.last_name) author from book b inner join author a on b.author_id = a.author_id WHERE b.title Ilike $1::VARCHAR(100) || '%'";
             break;
         case 'author':
             params = [param.replace(/\s/g, '').toLowerCase()];
@@ -240,22 +240,28 @@ function insertBook(request, response) {
     var number_in_series = 0;
     var book_id = 0;
     var param = [author.replace(/\s/g, '').toLowerCase()];
+    var bTest = false;
+    var first_name = "";
+    var middle_name = "";
+    var last_name = "";
     
     getAuthorIdFromDB(param, function (error, result) {
+        bTest = true;
         if (error || result == null) {
             response.status(500).json({
                 success: false,
                 data: error
             });
         } else {
+            bTest = true;
             if (result[0] != null || result[0] != undefined)
             {
                 author_id = result[0].author_id;
 
-                var first_name = "";
-                var middle_name = "";
-                var last_name = "";
-
+                //var first_name = "";
+                //var middle_name = "";
+                //var last_name = "";
+                bTest = true;
                 if (author_id > 0)
                 {
                     var params = {
@@ -286,7 +292,7 @@ function insertBook(request, response) {
                         }
                     });
                 }
-
+                bTest == true;
                 if (author_id == 0) {
                     var countSpaces = author.match(/([\s]+)/g).length
                     var author_name = author.split(" ");
@@ -345,19 +351,85 @@ function insertBook(request, response) {
                                                 result = { success: true };
                                             }
                                         }
-                                    })
+                                    });
                                 }
                             }
                         }
                     });
                 }
-            }            
+            }  
+            if (author_id == 0 && bTest == true)
+            {
+                if (author_id == 0) {
+                    var countSpaces = author.match(/([\s]+)/g).length
+                    var author_name = author.split(" ");
+
+                    if (countSpaces == 1) {
+                        first_name = author_name[0];
+                        middle_name = "";
+                        last_name = author_name[1];
+                    }
+                    else if (countSpaces >= 2) {
+                        first_name = author_name[0];
+                        middle_name = author_name[1];
+                        last_name = author_name[2];
+                    }
+
+                    var authorParams = {
+                        first_name: first_name,
+                        middle_name: middle_name,
+                        last_name: last_name
+                    };
+
+                    insertNewAuthor(authorParams, function (error, result) {
+                        if (error || result == null) {
+                            response.status(500).json({
+                                success: false,
+                                data: error
+                            });
+                        } else {
+                            if (result[0] != null || result[0] != undefined) {
+                                author_id = result[0].author_id
+
+                                if (author_id > 0) {
+                                    var params = {
+                                        author_id: author_id,
+                                        genre_id: genre_id,
+                                        format_id: format_id,
+                                        is_series: is_series,
+                                        series_id: series_id,
+                                        number_in_series: number_in_series,
+                                        title: title,
+                                        isbn: isbn,
+                                        pages: pages,
+                                        copyright: copyright,
+                                        description: description
+                                    };
+
+                                    insertNewBook(params, function (error, result) {
+                                        if (error || result == null) {
+                                            response.status(500).json({
+                                                success: false,
+                                                data: error
+                                            });
+                                        } else {
+                                            if (result[0] != null || result[0] != undefined) {
+                                                book_id = result[0].book_id;
+                                                result = { success: true };
+                                            }
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    });
+                }
+            }
         }
     });
 
     if (book_id > 0) {
         result = { success: true };
-        //window.location.reload(true); 
     }
 
     response.json(result);    
